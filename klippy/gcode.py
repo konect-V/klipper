@@ -189,12 +189,23 @@ class GCodeDispatch:
     # Parse input into commands
     args_r = re.compile('([A-Z_]+|[A-Z*])')
     def _process_commands(self, commands, need_ack=True):
+        last_move_cmd = "G0"
         for line in commands:
             # Ignore comments and leading/trailing spaces
             line = origline = line.strip()
             cpos = line.find(';')
             if cpos >= 0:
                 line = line[:cpos]
+            # Détecte la commande principale (avant injection)
+            line_upper = line.upper()
+            match_cmd = re.match(r'^[ \t]*(G[01])\b', line_upper)
+            if match_cmd:
+                last_move_cmd = match_cmd.group(1)
+            # Préfixe G0/G1 si la ligne commence par un paramètre de mouvement
+            if line and not line[:1].upper() in ('G', 'M'):
+                match = re.match(r'^[ \t]*([XYZEFS])', line, re.IGNORECASE)
+                if match:
+                    line = f'{last_move_cmd} {line}'
             # Break line into parts and determine command
             parts = self.args_r.split(line.upper())
             if ''.join(parts[:2]) == 'N':
