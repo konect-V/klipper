@@ -51,6 +51,12 @@ class AccelQueryHelper:
             # Avoid filling up memory with too many samples
             return False
         self.msgs.append(msg)
+
+        # live update
+        toolhead = self.printer.lookup_object('toolhead')
+        self.request_end_time = toolhead.get_last_move_time()
+
+        self.write_to_file("/dev/shm/live_adxl.csv")
         return True
     def has_valid_samples(self):
         for msg in self.msgs:
@@ -290,18 +296,9 @@ class ADXL345:
         self.query_adxl345_cmd.send_wait_ack([self.oid, 0])
         self.ffreader.note_end()
         logging.info("ADXL345 finished '%s' measurements", self.name)
-    def _send_live_measurements(self, samples):  
-        live_file_path = "/tmp/live_adxl.csv"
-        f = open(live_file_path, "w")
-        f.write("#time,accel_x,accel_y,accel_z\n")
-        for t, accel_x, accel_y, accel_z in samples:
-            f.write("%.6f,%.6f,%.6f,%.6f\n" % (
-                t, accel_x, accel_y, accel_z))
-        f.close()
     def _process_batch(self, eventtime):
         samples = self.ffreader.pull_samples()
         self._convert_samples(samples)
-        self._send_live_measurements(samples)
         if not samples:
             return {}
         return {'data': samples, 'errors': self.last_error_count,
